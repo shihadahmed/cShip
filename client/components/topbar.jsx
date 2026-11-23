@@ -1,14 +1,22 @@
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth';
 import {
   ChevronRightIcon,
   GithubIcon,
   LogoMark,
+  LogoutIcon,
   ServerIcon,
+  UserIcon,
 } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 export function Topbar() {
+  const { user, logout } = useAuth();
+
   return (
     <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur-md">
       <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
@@ -33,10 +41,41 @@ export function Topbar() {
             <ServerIcon className="h-3 w-3" />
             cPanel
           </Badge>
-          <span className="hidden items-center gap-1.5 rounded-md border border-border/80 bg-panel/60 px-2.5 py-1.5 text-xs text-muted sm:flex">
-            <GithubIcon className="h-3.5 w-3.5" />
-            Not connected
-          </span>
+          
+          {user ? (
+            <div className="flex items-center gap-2">
+              <span className="hidden items-center gap-1.5 rounded-md border border-border/80 bg-panel/60 px-2.5 py-1.5 text-xs text-muted sm:flex">
+                <GithubIcon className="h-3.5 w-3.5" />
+                {user.login}
+              </span>
+              <div className="flex items-center gap-2">
+                {user.avatarUrl && (
+                  <img
+                    src={user.avatarUrl}
+                    alt=""
+                    className="h-8 w-8 rounded-full border border-border/60"
+                  />
+                )}
+                <span className="hidden text-sm text-foreground sm:block">
+                  {user.name || user.login}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={logout}
+                  aria-label="Sign out"
+                >
+                  <LogoutIcon className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <span className="hidden items-center gap-1.5 rounded-md border border-border/80 bg-panel/60 px-2.5 py-1.5 text-xs text-muted sm:flex">
+              <GithubIcon className="h-3.5 w-3.5" />
+              Not connected
+            </span>
+          )}
+          
           <ThemeToggle />
         </div>
       </div>
