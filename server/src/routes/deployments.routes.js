@@ -3,8 +3,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { validateCsrf } from '../middleware/csrf.js';
 import { validate } from '../validators/validate.js';
 import { z } from 'zod';
-import { Deployment } from '../models/Deployment.js';
-import { Project } from '../models/Project.js';
+import Deployment from '../models/Deployment.js';
+import Project from '../models/Project.js';
 import { ObjectId } from 'mongodb';
 
 export const deploymentsRouter = express.Router();
