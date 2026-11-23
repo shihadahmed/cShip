@@ -16,10 +16,11 @@ export function createSessionMiddleware(config) {
   let useMongoStore = false;
 
   // Use separate URI for session store if provided, otherwise fall back to main URI
-  const sessionMongoUri = config.SESSION_MONGODB_URI || config.MONGODB_URI;
+  // Explicit 'memory' or empty string means use MemoryStore
+  const sessionMongoUri = config.SESSION_MONGODB_URI ?? config.MONGODB_URI;
 
-  // If no MongoDB URI, use memory store
-  if (!sessionMongoUri) {
+  // If no MongoDB URI, or explicitly set to 'memory'/'', use memory store
+  if (!sessionMongoUri || sessionMongoUri === 'memory' || sessionMongoUri === '') {
     store = new MemoryStore();
   } else {
     try {
