@@ -47,10 +47,15 @@ test('loadEnv accepts a complete production config', () => {
     SESSION_SECRET: 's'.repeat(32),
     TOKEN_ENCRYPTION_KEY: 'a'.repeat(64),
     CLIENT_ORIGIN: 'https://cship.example.com',
+    GITHUB_CLIENT_ID: 'test-client-id',
+    GITHUB_CLIENT_SECRET: 'test-client-secret',
+    GITHUB_CALLBACK_URL: 'https://cship.example.com/api/auth/github/callback',
+    ADMIN_GITHUB_LOGINS: 'alice,bob',
   });
 
   assert.equal(config.isProduction, true);
   assert.equal(config.NODE_ENV, 'production');
+  assert.deepEqual(config.adminGithubLogins, ['alice', 'bob']);
 });
 
 test('loadEnv rejects a malformed encryption key', () => {
