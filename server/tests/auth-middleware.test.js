@@ -12,19 +12,22 @@ process.env.TOKEN_ENCRYPTION_KEY = '0'.repeat(64);
 
 let mongod;
 let User;
+let sessionStore;
 
 test.before(async () => {
   mongod = await MongoMemoryServer.create();
   await mongoose.connect(mongod.getUri());
   User = (await import('../src/models/User.js')).default;
+  sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
 });
 
 test.after(async () => {
+  await sessionStore.close();
   await mongoose.disconnect();
   await mongod.stop();
 });
 
-function createApp(config, sessionStore) {
+function createApp(config) {
   const app = express();
   app.use(express.json());
   app.use(cookieParser());
@@ -55,8 +58,7 @@ test('requireAuth attaches req.user when session valid', async () => {
     MONGODB_URI: mongod.getUri(),
   };
   
-  const sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
-  const app = createApp(config, sessionStore);
+  const app = createApp(config);
 
   const { requireAuth } = await import('../src/middleware/auth.js');
   
@@ -90,8 +92,7 @@ test('requireAuth returns 401 without session', async () => {
     MONGODB_URI: mongod.getUri(),
   };
   
-  const sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
-  const app = createApp(config, sessionStore);
+  const app = createApp(config);
 
   const { requireAuth } = await import('../src/middleware/auth.js');
   app.get('/api/protected', requireAuth, (req, res) => res.json({ user: req.user.login }));
@@ -108,8 +109,7 @@ test('optionalAuth continues without user when no session', async () => {
     MONGODB_URI: mongod.getUri(),
   };
   
-  const sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
-  const app = createApp(config, sessionStore);
+  const app = createApp(config);
 
   const { optionalAuth } = await import('../src/middleware/auth.js');
   app.get('/api/optional', optionalAuth, (req, res) => res.json({ user: req.user?.login || null }));
@@ -127,8 +127,7 @@ test('optionalAuth attaches req.user when session valid', async () => {
     MONGODB_URI: mongod.getUri(),
   };
   
-  const sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
-  const app = createApp(config, sessionStore);
+  const app = createApp(config);
 
   const { optionalAuth } = await import('../src/middleware/auth.js');
   app.get('/api/optional', optionalAuth, (req, res) => res.json({ user: req.user?.login || null }));
@@ -161,8 +160,7 @@ test('requireAuth returns 401 for non-existent user', async () => {
     MONGODB_URI: mongod.getUri(),
   };
   
-  const sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
-  const app = createApp(config, sessionStore);
+  const app = createApp(config);
 
   const { requireAuth } = await import('../src/middleware/auth.js');
   app.get('/api/protected', requireAuth, (req, res) => res.json({ user: req.user.login }));
@@ -186,8 +184,7 @@ test('session cookie has correct attributes', async () => {
     MONGODB_URI: mongod.getUri(),
   };
   
-  const sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
-  const app = createApp(config, sessionStore);
+  const app = createApp(config);
 
   app.get('/api/set-session', (req, res) => {
     req.session.userId = 'test';
