@@ -1,7 +1,7 @@
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_OAUTH_BASE = 'https://github.com/login/oauth';
 
-export function createGitHubClient({ getDecryptedToken, baseUrl = GITHUB_API_BASE }) {
+export function createGitHubClient({ getDecryptedToken, baseUrl = GITHUB_API_BASE, mock = false }) {
   async function request(path, options = {}) {
     const token = await getDecryptedToken();
     const url = `${baseUrl}${path}`;
@@ -134,6 +134,19 @@ export function createGitHubClient({ getDecryptedToken, baseUrl = GITHUB_API_BAS
     },
 
     async createWebhook(owner, repo, config) {
+      if (mock) {
+        return {
+          id: Math.floor(Math.random() * 1000000),
+          name: 'web',
+          active: true,
+          events: ['push'],
+          config: {
+            url: config.url,
+            content_type: 'json',
+            secret: config.secret || 'mock-secret',
+          },
+        };
+      }
       return request(`/repos/${owner}/${repo}/hooks`, {
         method: 'POST',
         body: JSON.stringify(config),
@@ -141,6 +154,9 @@ export function createGitHubClient({ getDecryptedToken, baseUrl = GITHUB_API_BAS
     },
 
     async deleteWebhook(owner, repo, hookId) {
+      if (mock) {
+        return null;
+      }
       return request(`/repos/${owner}/${repo}/hooks/${hookId}`, {
         method: 'DELETE',
       });
