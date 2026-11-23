@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+**/tmp/restart.txt
+.superpowers/
+.DS_Store
+Thumbs.db
+.vercel/
+server/deployments/
+client/.env.local

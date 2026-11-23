@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 45 20% 97%;
+    --foreground: 222 30% 12%;
+    --panel: 0 0% 100%;
+    --raised: 40 18% 94%;
+    --border: 220 14% 86%;
+    --muted: 218 10% 42%;
+    --accent: 168 76% 30%;
+    --accent-foreground: 0 0% 100%;
+    --success: 158 64% 36%;
+    --warning: 32 90% 40%;
+    --danger: 0 70% 48%;
+  }
+
+  .dark {
+    --background: 222 32% 6%;
+    --foreground: 210 20% 92%;
+    --panel: 220 24% 9%;
+    --raised: 219 22% 12%;
+    --border: 218 18% 18%;
+    --muted: 215 12% 58%;
+    --accent: 162 72% 50%;
+    --accent-foreground: 222 32% 6%;
+    --success: 158 64% 44%;
+    --warning: 38 92% 58%;
+    --danger: 0 72% 58%;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply min-h-screen bg-background font-sans text-foreground antialiased;
+    font-feature-settings:
+      'ss01' 1,
+      'cv01' 1;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  ::selection {
+    background: hsl(var(--accent) / 0.28);
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+}
+
+@layer components {
+  .blueprint {
+    background-image: radial-gradient(
+      hsl(var(--border) / 0.65) 0.5px,
+      transparent 0.5px
+    );
+    background-size: 18px 18px;
+    -webkit-mask-image: radial-gradient(
+      ellipse at top,
+      black 10%,
+      transparent 72%
+    );
+    mask-image: radial-gradient(ellipse at top, black 10%, transparent 72%);
+  }
+
+  .reveal {
+    animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .terminal-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
