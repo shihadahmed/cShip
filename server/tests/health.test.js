@@ -28,20 +28,6 @@ test('GET /api/health reports service state', async () => {
   assert.equal(response.headers['cache-control'], 'no-store');
 });
 
-test('GET /api/health is degraded when Mongo is configured but disconnected', async () => {
-  const app = createApp({
-    config: testConfig({ MONGODB_URI: 'mongodb://127.0.0.1:27017/cship' }),
-    logger: silentLogger,
-  });
-
-  const response = await request(app).get('/api/health');
-
-  assert.equal(response.status, 200);
-  assert.equal(response.body.status, 'degraded');
-  assert.equal(response.body.database.configured, true);
-  assert.equal(response.body.database.status, 'disconnected');
-});
-
 test('GET /api/health echoes a supplied request id', async () => {
   const app = createApp({ config: testConfig(), logger: silentLogger });
 

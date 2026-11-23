@@ -48,6 +48,50 @@ const envSchema = z
         message: 'MONGODB_URI is required in production',
       });
     }
+    if (value.NODE_ENV === 'production') {
+      if (!value.SESSION_SECRET || value.SESSION_SECRET.length < 32) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['SESSION_SECRET'],
+          message: 'SESSION_SECRET must be at least 32 characters in production',
+        });
+      }
+      if (!value.TOKEN_ENCRYPTION_KEY) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['TOKEN_ENCRYPTION_KEY'],
+          message: 'TOKEN_ENCRYPTION_KEY is required in production',
+        });
+      }
+      if (!value.GITHUB_CLIENT_ID) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['GITHUB_CLIENT_ID'],
+          message: 'GITHUB_CLIENT_ID is required in production',
+        });
+      }
+      if (!value.GITHUB_CLIENT_SECRET) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['GITHUB_CLIENT_SECRET'],
+          message: 'GITHUB_CLIENT_SECRET is required in production',
+        });
+      }
+      if (!value.GITHUB_CALLBACK_URL) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['GITHUB_CALLBACK_URL'],
+          message: 'GITHUB_CALLBACK_URL is required in production',
+        });
+      }
+      if (!value.ADMIN_GITHUB_LOGINS || splitList(value.ADMIN_GITHUB_LOGINS).length === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ADMIN_GITHUB_LOGINS'],
+          message: 'ADMIN_GITHUB_LOGINS is required in production (comma-separated list)',
+        });
+      }
+    }
   });
 
 export class EnvValidationError extends Error {

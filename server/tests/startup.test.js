@@ -1,18 +1,41 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
-import { startServer } from '../src/start-server.js';
 import { silentLogger, testConfig } from './helpers.js';
+import { MongoMemoryServer } from 'mongodb-memory-server';
+
+// Set required env vars before importing startServer
+process.env.TOKEN_ENCRYPTION_KEY = '0'.repeat(64);
+
+let startServer;
+let mongod;
+
+test.before(async () => {
+  const mod = await import('../src/start-server.js');
+  startServer = mod.startServer;
+  mongod = await MongoMemoryServer.create();
+});
+
+test.after(async () => {
+  await mongod.stop();
+});
 
 test('production boots and serves degraded health when the database is unreachable', async () => {
   let attempts = 0;
+  
+  // Use real MongoDB for session middleware, fake URI for main DB
+  const sessionUri = mongod.getUri();
+  const fakeUri = 'mongodb://127.0.0.1:1/cship';
 
   const instance = await startServer({
     config: testConfig({
       NODE_ENV: 'production',
       isProduction: true,
-      MONGODB_URI: 'mongodb://127.0.0.1:1/cship',
+      MONGODB_URI: fakeUri,
+      SESSION_MONGODB_URI: sessionUri,
       PORT: 0,
+      TOKEN_ENCRYPTION_KEY: '0'.repeat(64),
+      SESSION_SECRET: 'a'.repeat(32),
     }),
     logger: silentLogger,
     connect: async () => {

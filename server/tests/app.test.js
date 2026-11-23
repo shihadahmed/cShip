@@ -1,23 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { createApp } from '../src/app.js';
-import { silentLogger, testConfig, setTestMongod } from './helpers.js';
-
-let mongod;
-
-test.before(async () => {
-  mongod = await MongoMemoryServer.create();
-  setTestMongod(mongod);
-});
-
-test.after(async () => {
-  await mongod.stop();
-});
+import { silentLogger, testConfig } from './helpers.js';
 
 test('does not emit CORS headers for origins outside the allowlist', async () => {
-  const app = createApp({ config: testConfig(), logger: silentLogger });
+  const app = createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
 
   const response = await request(app)
     .get('/api/health')
@@ -27,7 +15,7 @@ test('does not emit CORS headers for origins outside the allowlist', async () =>
 });
 
 test('replaces unsafe request ids instead of trusting them', async () => {
-  const app = createApp({ config: testConfig(), logger: silentLogger });
+  const app = createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
 
   const response = await request(app)
     .get('/api/health')
@@ -38,7 +26,7 @@ test('replaces unsafe request ids instead of trusting them', async () => {
 });
 
 test('returns a structured 400 for malformed JSON', async () => {
-  const app = createApp({ config: testConfig(), logger: silentLogger });
+  const app = createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
 
   const response = await request(app)
     .post('/api/health')

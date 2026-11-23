@@ -12,44 +12,58 @@ async function getUserModel() {
 }
 
 export function createSessionMiddleware(config) {
-  if (!config.MONGODB_URI) {
-    throw new Error('MONGODB_URI is required for session middleware');
-  }
-
   let store;
   let useMongoStore = false;
 
-  try {
-    const mongoStore = MongoStore.create({
-      mongoUrl: config.MONGODB_URI,
-      ttl: 14 * 24 * 60 * 60,
-      autoRemove: 'native',
-      touchAfter: 24 * 3600,
-    });
+  // Use separate URI for session store if provided, otherwise fall back to main URI
+  const sessionMongoUri = config.SESSION_MONGODB_URI || config.MONGODB_URI;
 
-    // Handle MongoStore connection errors gracefully
-    mongoStore.on('error', (err) => {
-      console.error('MongoStore error:', err.message);
-    });
-
-    // Start with memory store, switch to MongoStore if connection succeeds
+  // If no MongoDB URI, use memory store
+  if (!sessionMongoUri) {
     store = new MemoryStore();
-    useMongoStore = false;
-
-    // Try to use MongoStore asynchronously
-    mongoStore.clientPromise
-      .then((client) => {
-        store = mongoStore;
-        useMongoStore = true;
-        console.log('MongoStore connected successfully');
-      })
-      .catch((err) => {
-        console.warn('MongoStore connection failed, using memory store:', err.message);
-        // Keep using memory store
+  } else {
+    try {
+      // Create a wrapper that ensures the MongoStore connection promise is properly handled
+      const mongoStore = MongoStore.create({
+        mongoUrl: sessionMongoUri,
+        ttl: 14 * 24 * 60 * 60,
+        autoRemove: 'native',
+        touchAfter: 24 * 3600,
       });
-  } catch {
-    console.warn('MongoStore creation failed, falling back to memory store');
-    store = new MemoryStore();
+
+      // Handle MongoStore connection errors gracefully
+      mongoStore.on('error', (err) => {
+        console.error('MongoStore error:', err.message);
+      });
+
+      // Start with memory store, switch to MongoStore if connection succeeds
+      store = new MemoryStore();
+      useMongoStore = false;
+
+      // Try to use MongoStore asynchronously
+      // Create a handled promise that never rejects unhandled
+      const clientPromise = mongoStore.clientPromise;
+      if (clientPromise && typeof clientPromise.then === 'function') {
+        const handledPromise = clientPromise.then(
+          (client) => {
+            store = mongoStore;
+            useMongoStore = true;
+            console.log('MongoStore connected successfully');
+            return client;
+          },
+          (err) => {
+            console.warn('MongoStore connection failed, using memory store:', err.message);
+            // Keep using memory store
+            return null;
+          }
+        );
+        // Prevent unhandled rejection by attaching a noop catch
+        handledPromise.catch(() => {});
+      }
+    } catch {
+      console.warn('MongoStore creation failed, falling back to memory store');
+      store = new MemoryStore();
+    }
   }
 
   const sessionMiddleware = session({

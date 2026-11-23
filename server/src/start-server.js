@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { connectDatabase, disconnectDatabase } from './config/db.js';
+import { registerRoutes } from './routes/index.js';
 
 const DEFAULT_RETRY_BASE_MS = 1000;
 const DEFAULT_RETRY_MAX_MS = 30000;
@@ -33,7 +34,7 @@ export async function startServer({
   if (!config) throw new Error('startServer requires a config object');
   if (!logger) throw new Error('startServer requires a logger');
 
-  const app = createApp({ config, logger });
+  const app = createApp({ config, logger, registerRoutes });
   const server = createServer(app);
 
   server.keepAliveTimeout = 65000;

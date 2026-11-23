@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { loadEnv } from './src/config/env.js';
 import { createLogger } from './src/lib/logger.js';
 import { startServer } from './src/start-server.js';
+import { registerRoutes } from './src/routes/index.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10000;
 
@@ -21,7 +22,7 @@ async function main() {
     nodeEnv: config.NODE_ENV,
   });
 
-  const { close } = await startServer({ config, logger });
+  const { close } = await startServer({ config, logger, registerRoutes });
 
   let shuttingDown = false;
 
