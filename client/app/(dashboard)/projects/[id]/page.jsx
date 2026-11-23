@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DeploymentConsole } from '@/components/DeploymentConsole';
 import {
   GithubIcon, GitBranchIcon, ServerIcon, ExternalLinkIcon, TrashIcon,
-  ChevronLeftIcon, LoaderIcon, CheckCircleIcon, XCircleIcon, PauseIcon, RotateCcwIcon
+  ChevronLeftIcon, LoaderIcon, CheckCircleIcon, XCircleIcon, PauseIcon, RotateCcwIcon, SettingsIcon
 } from '@/components/icons';
 import { fetchJson } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -174,6 +174,12 @@ export default function ProjectDetailPage() {
             <Button variant="outline">
               <ExternalLinkIcon className="mr-2 h-4 w-4" />
               View on GitHub
+            </Button>
+          </Link>
+          <Link href={`/projects/${projectId}/settings`}>
+            <Button variant="outline">
+              <SettingsIcon className="mr-2 h-4 w-4" />
+              Settings
             </Button>
           </Link>
           <Button variant="secondary" onClick={handleNewDeploy} disabled={actionLoading}>
