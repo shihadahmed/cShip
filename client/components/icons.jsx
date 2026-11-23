@@ -226,3 +226,119 @@ export function HardDriveIcon(props) {
     </IconBase>
   );
 }
+
+export function LogoutIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </IconBase>
+  );
+}
+
+export function LoaderIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </IconBase>
+  );
+}
+
+export function ChevronLeftIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="m15 18-6-6 6-6" />
+    </IconBase>
+  );
+}
+
+export function ExternalLinkIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </IconBase>
+  );
+}
+
+export function TrashIcon(props) {
+  return (
+    <IconBase {...props}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </IconBase>
+  );
+}
+
+export function XIcon(props) {
+  return (
+    <IconBase {...props}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </IconBase>
+  );
+}
+
+export function ChevronUpIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="m18 15-6-6-6 6" />
+    </IconBase>
+  );
+}
+
+export function ChevronDownIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </IconBase>
+  );
+}
+
+export function SearchIcon(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </IconBase>
+  );
+}
+
+export function CheckCircleIcon(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </IconBase>
+  );
+}
+
+export function XCircleIcon(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="15" y1="9" x2="9" y2="15" />
+      <line x1="9" y1="9" x2="15" y2="15" />
+    </IconBase>
+  );
+}
+
+export function PauseIcon(props) {
+  return (
+    <IconBase {...props}>
+      <rect x="6" y="4" width="4" height="16" />
+      <rect x="14" y="4" width="4" height="16" />
+    </IconBase>
+  );
+}
+
+export function RotateCcwIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M3 7v6h6" />
+      <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+    </IconBase>
+  );
+}
