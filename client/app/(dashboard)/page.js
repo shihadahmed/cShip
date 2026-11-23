@@ -1,3 +1,5 @@
+'use client';
+
 import {
   CheckIcon,
   DeploymentsIcon,
@@ -5,41 +7,43 @@ import {
   GitBranchIcon,
   PlusIcon,
   ProjectsIcon,
+  ServerIcon,
   ShieldIcon,
   TerminalIcon,
 } from '@/components/icons';
+import Link from 'next/link';
 import { SystemStatus } from '@/components/system-status';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
 import { cn } from '@/lib/cn';
+import { fetchJson } from '@/lib/api';
+import { useEffect, useState } from 'react';
 
-export const metadata = {
-  title: 'Overview',
-};
-
-const STATS = [
-  {
-    label: 'Projects',
-    value: '0',
-    hint: 'No repositories connected',
-  },
-  {
-    label: 'Deployments',
-    value: '0',
-    hint: 'Build history is empty',
-  },
-  {
-    label: 'Build queue',
-    value: '—',
-    hint: 'Ships in Phase 3',
-  },
-  {
-    label: 'Heap cap',
-    value: '512 MB',
-    hint: 'Default cap · configurable',
-  },
-];
+function Stats({ projects }) {
+  return [
+    {
+      label: 'Projects',
+      value: String(projects.length),
+      hint: projects.length === 0 ? 'No repositories connected' : `${projects.length} project${projects.length !== 1 ? 's' : ''} connected`,
+    },
+    {
+      label: 'Deployments',
+      value: '0',
+      hint: 'Build history is empty',
+    },
+    {
+      label: 'Build queue',
+      value: '—',
+      hint: 'Ships in Phase 3',
+    },
+    {
+      label: 'Heap cap',
+      value: '512 MB',
+      hint: 'Default cap · configurable',
+    },
+  ];
+}
 
 const NEXT_UP = [
   {
@@ -60,6 +64,28 @@ const NEXT_UP = [
 ];
 
 export default function OverviewPage() {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchJson('/api/projects')
+      .then(data => {
+        if (mounted) {
+          setProjects(data.projects || []);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+    return () => { mounted = false; };
+  }, []);
+
+  const stats = Stats({ projects });
+
   return (
     <div className="reveal space-y-7">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -72,23 +98,17 @@ export default function OverviewPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            disabled
-            title="GitHub authentication arrives in Phase 2"
-            className="whitespace-nowrap"
-          >
-            <PlusIcon className="h-4 w-4" />
-            New project
-            <Badge variant="outline" className="ml-1">
-              Phase 2
-            </Badge>
-          </Button>
+          <Link href="/projects/new">
+            <Button variant="secondary" className="whitespace-nowrap">
+              <PlusIcon className="h-4 w-4" />
+              New project
+            </Button>
+          </Link>
         </div>
       </header>
 
       <dl className="grid grid-cols-2 overflow-hidden rounded-lg border border-border/80 bg-panel/60 shadow-panel sm:grid-cols-4">
-        {STATS.map((stat, index) => (
+        {stats.map((stat, index) => (
           <div
             key={stat.label}
             className={cn(
@@ -113,35 +133,62 @@ export default function OverviewPage() {
             <PanelHeader
               title="Projects"
               description="Repositories connected to this cPanel account"
-              action={<Badge variant="outline">0 deployed</Badge>}
+              action={<Badge variant="outline">{projects.length} deployed</Badge>}
             />
             <PanelBody>
-              <div className="relative overflow-hidden rounded-md border border-dashed border-border/90 bg-background/30 px-5 py-10 text-center sm:px-8">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--accent)_/_0.08),transparent_60%)]" />
-                <div className="relative mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-accent/20 bg-accent/10 text-accent">
-                  <ProjectsIcon className="h-6 w-6" />
+              {loading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
                 </div>
-                <h2 className="relative mt-4 text-base font-medium">
-                  Your fleet is empty
-                </h2>
-                <p className="relative mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted">
-                  Connect a GitHub repository to deploy your first project to a
-                  cPanel subdomain. cShip will provision the subdomain, write
-                  environment values, and restart Passenger.
-                </p>
-                <div className="relative mt-5 flex flex-wrap items-center justify-center gap-2">
-                  <Button variant="secondary" disabled>
-                    <GithubIcon className="h-4 w-4" />
-                    Connect GitHub
-                    <Badge variant="outline" className="ml-1">
-                      Phase 2
-                    </Badge>
-                  </Button>
-                  <span className="text-xs text-muted">
-                    The project wizard arrives next.
-                  </span>
+              ) : projects.length === 0 ? (
+                <div className="relative overflow-hidden rounded-md border border-dashed border-border/90 bg-background/30 px-5 py-10 text-center sm:px-8">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--accent)_/_0.08),transparent_60%)]" />
+                  <div className="relative mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-accent/20 bg-accent/10 text-accent">
+                    <ProjectsIcon className="h-6 w-6" />
+                  </div>
+                  <h2 className="relative mt-4 text-base font-medium">
+                    Your fleet is empty
+                  </h2>
+                  <p className="relative mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted">
+                    Connect a GitHub repository to deploy your first project to a
+                    cPanel subdomain. cShip will provision the subdomain, write
+                    environment values, and restart Passenger.
+                  </p>
+                  <div className="relative mt-5 flex flex-wrap items-center justify-center gap-2">
+                    <Link href="/projects/new">
+                      <Button variant="primary">
+                        <GithubIcon className="h-4 w-4" />
+                        Create Your First Project
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {projects.map(project => (
+                    <Link key={project._id} href={`/projects/${project._id}`} className="block">
+                      <div className="rounded-lg border border-border/60 bg-raised/50 p-4 hover:border-accent/50 hover:bg-raised transition-colors">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-foreground truncate">{project.name}</h3>
+                            {project.subdomain && (
+                              <Badge variant="outline" className="mt-1 flex items-center gap-1 text-xs">
+                                <ServerIcon className="h-3 w-3" />
+                                {project.subdomain}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+                          <span className="truncate max-w-[200px]">{project.repoFullName}</span>
+                          <span>•</span>
+                          <span>{project.defaultBranch || 'main'}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </PanelBody>
           </Panel>
 
