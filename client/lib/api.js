@@ -5,33 +5,144 @@ export function getApiBaseUrl() {
   );
 }
 
-function getCsrfToken() {
-  const meta = document.querySelector('meta[name="csrf-token"]');
-  return meta?.getAttribute('content') || '';
+export class ApiError extends Error {
+  constructor(message, { status = 0, code = 'REQUEST_FAILED' } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const CSRF_META_NAME = 'csrf-token';
+let csrfToken = '';
+let csrfRequest = null;
+
+function readCsrfTokenFromMeta() {
+  if (typeof document === 'undefined') return '';
+  return (
+    document
+      .querySelector(`meta[name="${CSRF_META_NAME}"]`)
+      ?.getAttribute('content') || ''
+  );
+}
+
+function writeCsrfTokenToMeta(token) {
+  if (typeof document === 'undefined') return;
+  let meta = document.querySelector(`meta[name="${CSRF_META_NAME}"]`);
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = CSRF_META_NAME;
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', token);
+}
+
+export function getCsrfToken() {
+  return csrfToken || readCsrfTokenFromMeta();
+}
+
+export function setCsrfToken(token) {
+  csrfToken = token || '';
+  if (token) writeCsrfTokenToMeta(token);
+}
+
+/**
+ * Fetches a CSRF token once and caches it. Mutating requests automatically
+ * obtain a token, so the client never sends a POST/PATCH/DELETE without one.
+ */
+export async function ensureCsrfToken({ force = false } = {}) {
+  if (typeof window === 'undefined') return '';
+
+  if (!force) {
+    const existing = getCsrfToken();
+    if (existing) return existing;
+    if (csrfRequest) return csrfRequest;
+  }
+
+  csrfRequest = fetch(`${getApiBaseUrl()}/api/csrf-token`, {
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new ApiError('Unable to initialize CSRF token', {
+          status: response.status,
+          code: 'CSRF_INIT_FAILED',
+        });
+      }
+      const data = await response.json();
+      setCsrfToken(data?.csrfToken || '');
+      return getCsrfToken();
+    })
+    .finally(() => {
+      csrfRequest = null;
+    });
+
+  return csrfRequest;
+}
+
+function notifyUnauthorized() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('cship:unauthorized'));
+  }
+}
+
+async function parseApiError(response) {
+  const body = await response.json().catch(() => null);
+  return new ApiError(
+    body?.error?.message || `Request failed with status ${response.status}`,
+    {
+      status: response.status,
+      code: body?.error?.code || 'REQUEST_FAILED',
+    },
+  );
+}
+
+async function sendRequest(url, { method, body, headers, ...rest }) {
+  const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(method);
+  return fetch(`${getApiBaseUrl()}${url}`, {
+    ...rest,
+    method,
+    body,
+    credentials: 'include',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(mutating ? { 'X-CSRF-Token': getCsrfToken() } : {}),
+      ...headers,
+    },
+  });
 }
 
 export async function fetchJson(url, options = {}) {
-  const response = await fetch(`${getApiBaseUrl()}${url}`, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': getCsrfToken(),
-      ...options.headers,
-    },
-  });
+  const method = (options.method || 'GET').toUpperCase();
+  const mutating = !['GET', 'HEAD', 'OPTIONS'].includes(method);
+
+  if (mutating) await ensureCsrfToken();
+
+  let response = await sendRequest(url, { ...options, method });
+
+  if (mutating && response.status === 403) {
+    const error = await parseApiError(response);
+    if (error.code !== 'CSRF_ERROR') throw error;
+    // Token rotated or expired: fetch a fresh one and retry once.
+    await ensureCsrfToken({ force: true });
+    response = await sendRequest(url, { ...options, method });
+  }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || `Request failed with status ${response.status}`);
+    const error = await parseApiError(response);
+    if (error.status === 401) notifyUnauthorized();
+    throw error;
   }
 
-  if (response.status === 204) {
-    return null;
-  }
+  if (response.status === 204) return null;
 
-  return response.json();
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 export async function fetchHealth({ signal } = {}) {
@@ -49,7 +160,14 @@ export async function fetchHealth({ signal } = {}) {
 }
 
 export async function fetchMe() {
-  return fetchJson('/api/auth/me');
+  try {
+    return await fetchJson('/api/auth/me');
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function login() {
@@ -57,8 +175,11 @@ export async function login() {
 }
 
 export async function logout() {
-  await fetchJson('/api/auth/logout', { method: 'POST' });
-  window.location.href = '/login';
+  try {
+    await fetchJson('/api/auth/logout', { method: 'POST' });
+  } finally {
+    window.location.href = '/login';
+  }
 }
 
 export async function fetchGitHubRepos() {
