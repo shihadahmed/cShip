@@ -13,6 +13,18 @@ function generateState() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function getDashboardUrl(config) {
+  const origins =
+    Array.isArray(config.clientOrigins) && config.clientOrigins.length > 0
+      ? config.clientOrigins
+      : String(config.CLIENT_ORIGIN || '')
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean);
+
+  return origins[0] || '/';
+}
+
 authRouter.get('/github', (req, res) => {
   const config = req.app.locals.config;
   const state = generateState();
@@ -108,7 +120,7 @@ authRouter.get('/github/callback', validate(githubCallbackSchema), async (req, r
     req.session.userId = user._id;
     req.session.save(err => {
       if (err) return next(err);
-      const redirectUrl = config.PUBLIC_SERVER_URL || '/';
+      const redirectUrl = getDashboardUrl(config);
       res.redirect(redirectUrl);
     });
   } catch (error) {
