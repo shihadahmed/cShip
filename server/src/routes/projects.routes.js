@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'node:crypto';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/auth.js';
 import { validateCsrf } from '../middleware/csrf.js';
 import { projectIdSchema, createProjectSchema, updateProjectSchema } from '../validators/projects.js';
 import { validate } from '../validators/validate.js';
@@ -10,7 +10,7 @@ import { createGitHubClient } from '../services/github/index.js';
 
 export const projectsRouter = express.Router();
 
-projectsRouter.use(requireAuth);
+projectsRouter.use(requireAdmin);
 
 projectsRouter.get('/', async (req, res, next) => {
   try {

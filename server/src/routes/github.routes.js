@@ -1,12 +1,12 @@
 import express from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/auth.js';
 import { createGitHubClient } from '../services/github/index.js';
 import { repoParamsSchema, branchParamsSchema } from '../validators/github.js';
 import { validate } from '../validators/validate.js';
 
 export const githubRouter = express.Router();
 
-githubRouter.use(requireAuth);
+githubRouter.use(requireAdmin);
 
 githubRouter.get('/repos', async (req, res, next) => {
   try {

@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/auth.js';
 import { validateCsrf } from '../middleware/csrf.js';
 import { validate } from '../validators/validate.js';
 import { projectIdSchema, deploymentIdSchema, createDeploymentSchema, redeploySchema, rollbackSchema } from '../validators/deployments.js';
@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 
 export const deploymentsRouter = express.Router();
 
-deploymentsRouter.use(requireAuth);
+deploymentsRouter.use(requireAdmin);
 
 deploymentsRouter.get('/:projectId', validate(projectIdSchema), async (req, res, next) => {
   try {
