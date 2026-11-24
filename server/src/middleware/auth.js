@@ -100,7 +100,7 @@ export async function requireAuth(req, res, next) {
   }
 
   const User = await getUserModel();
-  const user = await User.findById(userId).lean();
+  const user = await User.findById(userId);
   if (!user) {
     return res.status(401).json({
       error: {
