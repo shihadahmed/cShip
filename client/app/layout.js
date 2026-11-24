@@ -1,5 +1,6 @@
 import { GeistMono } from 'geist/font/mono';
 import { GeistSans } from 'geist/font/sans';
+import { headers } from 'next/headers';
 import './globals.css';
 
 export const metadata = {
@@ -22,7 +23,11 @@ const themeScript = `
 })();
 `;
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  // Nonce is forwarded by middleware on the request headers so inline scripts
+  // can be allowlisted by CSP on the very first render.
+  const nonce = (await headers()).get('x-nonce') || '';
+
   return (
     <html
       lang="en"
@@ -30,7 +35,10 @@ export default function RootLayout({ children }) {
       className={`${GeistSans.variable} ${GeistMono.variable}`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
       </head>
       <body>{children}</body>
     </html>
