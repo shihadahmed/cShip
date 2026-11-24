@@ -2,7 +2,6 @@ import express from 'express';
 import crypto from 'node:crypto';
 import Deployment from '../models/Deployment.js';
 import Project from '../models/Project.js';
-import { validate } from '../validators/validate.js';
 import { z } from 'zod';
 
 export const webhooksRouter = express.Router();

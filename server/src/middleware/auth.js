@@ -13,7 +13,6 @@ async function getUserModel() {
 
 export function createSessionMiddleware(config) {
   let store;
-  let useMongoStore = false;
 
   // Use separate URI for session store if provided, otherwise fall back to main URI
   // Explicit 'memory' or empty string means use MemoryStore
@@ -39,7 +38,6 @@ export function createSessionMiddleware(config) {
 
       // Start with memory store, switch to MongoStore if connection succeeds
       store = new MemoryStore();
-      useMongoStore = false;
 
       // Try to use MongoStore asynchronously
       // Create a handled promise that never rejects unhandled
@@ -48,7 +46,6 @@ export function createSessionMiddleware(config) {
         const handledPromise = clientPromise.then(
           (client) => {
             store = mongoStore;
-            useMongoStore = true;
             console.log('MongoStore connected successfully');
             return client;
           },

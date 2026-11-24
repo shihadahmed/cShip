@@ -1,4 +1,4 @@
-import { UapiError, UapiNotFoundError, UapiPermissionError } from './uapi-client.js';
+import { UapiError, UapiNotFoundError } from './uapi-client.js';
 
 export class PassengerError extends Error {
   constructor(message, code, details = {}) {

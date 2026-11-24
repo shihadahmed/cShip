@@ -1,6 +1,3 @@
-import crypto from 'node:crypto';
-import { HttpError } from '../../lib/http-error.js';
-
 export class UapiError extends Error {
   constructor(message, status, errors = [], metadata = {}) {
     super(message);

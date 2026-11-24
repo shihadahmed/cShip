@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'node:crypto';
-import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { optionalAuth } from '../middleware/auth.js';
 import { validateCsrf } from '../middleware/csrf.js';
 import { githubCallbackSchema, logoutSchema } from '../validators/auth.js';
 import { validate } from '../validators/validate.js';
