@@ -1,60 +1,81 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getApiBaseUrl } from './api';
+import {
+  ensureCsrfToken,
+  fetchJson,
+  fetchMe,
+  getApiBaseUrl,
+} from './api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
+  const refresh = useCallback(async () => {
+    try {
+      const data = await fetchMe();
+      setUser(data?.user ?? null);
+      setSessionExpired(false);
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Restore the session on mount. The session cookie is HttpOnly, so the only
+  // way to know whether it is still valid is to ask the API.
   useEffect(() => {
-    let mounted = true;
-    fetchMe().then(data => {
-      if (mounted) {
-        setUser(data?.user || null);
-        setLoading(false);
-      }
-    }).catch(() => {
-      if (mounted) {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-    return () => { mounted = false; };
+    refresh();
+    ensureCsrfToken().catch(() => {});
+  }, [refresh]);
+
+  // Any API call that returns 401 drops the local auth state and sends the
+  // user back to the login page.
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      setSessionExpired(true);
+    };
+    window.addEventListener('cship:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('cship:unauthorized', handleUnauthorized);
   }, []);
 
   useEffect(() => {
-    if (!loading && !user && pathname !== '/login') {
-      router.push('/login');
+    if (loading) return;
+    if (!user && pathname !== '/login') {
+      router.replace(sessionExpired ? '/login?error=session_expired' : '/login');
     }
-  }, [loading, user, pathname, router]);
+  }, [loading, user, pathname, sessionExpired, router]);
 
   const login = () => {
     window.location.href = `${getApiBaseUrl()}/api/auth/github`;
   };
 
   const logout = async () => {
-    const csrfToken = getCsrfToken();
-    await fetch(`${getApiBaseUrl()}/api/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'X-CSRF-Token': csrfToken },
-    });
+    try {
+      await fetchJson('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore logout failures: local state is cleared regardless.
+    }
     setUser(null);
-    router.push('/login');
+    router.replace('/login');
   };
 
-  if (loading) {
+  // Do not render protected content while the session is unknown or missing.
+  if (loading || !user) {
     return <div className="flex h-screen items-center justify-center">Loading…</div>;
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );
@@ -68,23 +89,4 @@ export function useAuth() {
   return context;
 }
 
-export async function fetchMe() {
-  const res = await fetch(`${getApiBaseUrl()}/api/auth/me`, { credentials: 'include' });
-  if (res.status === 401) return null;
-  return res.json();
-}
-
-export function getCsrfToken() {
-  const meta = document.querySelector('meta[name="csrf-token"]');
-  return meta?.getAttribute('content') || '';
-}
-
-export function setCsrfToken(token) {
-  let meta = document.querySelector('meta[name="csrf-token"]');
-  if (!meta) {
-    meta = document.createElement('meta');
-    meta.name = 'csrf-token';
-    document.head.appendChild(meta);
-  }
-  meta.setAttribute('content', token);
-}
+export { fetchMe, getCsrfToken, setCsrfToken } from './api';
