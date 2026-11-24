@@ -5,7 +5,7 @@ import { createApp } from '../src/app.js';
 import { silentLogger, testConfig } from './helpers.js';
 
 test('GET /api/health reports service state', async () => {
-  const app = createApp({ config: testConfig(), logger: silentLogger });
+  const app = await createApp({ config: testConfig(), logger: silentLogger });
 
   const response = await request(app)
     .get('/api/health')
@@ -29,7 +29,7 @@ test('GET /api/health reports service state', async () => {
 });
 
 test('GET /api/health echoes a supplied request id', async () => {
-  const app = createApp({ config: testConfig(), logger: silentLogger });
+  const app = await createApp({ config: testConfig(), logger: silentLogger });
 
   const response = await request(app)
     .get('/api/health')

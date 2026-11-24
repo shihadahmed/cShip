@@ -17,7 +17,9 @@ test('tampered ciphertext throws', async () => {
   const key = '0'.repeat(64);
   const { encrypt, decrypt } = createCrypto(key);
   const enc = encrypt('secret');
-  enc.ciphertext = enc.ciphertext.slice(0, -1) + 'x';
+  // Guarantee the tampered value differs from the original (the last base64
+  // character may already be the replacement character, which made this flaky).
+  enc.ciphertext = (enc.ciphertext[0] === 'A' ? 'B' : 'A') + enc.ciphertext.slice(1);
   assert.throws(() => decrypt(enc), /auth tag/);
 });
 

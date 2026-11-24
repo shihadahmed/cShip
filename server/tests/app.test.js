@@ -5,7 +5,7 @@ import { createApp } from '../src/app.js';
 import { silentLogger, testConfig } from './helpers.js';
 
 test('does not emit CORS headers for origins outside the allowlist', async () => {
-  const app = createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
+  const app = await createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
 
   const response = await request(app)
     .get('/api/health')
@@ -15,7 +15,7 @@ test('does not emit CORS headers for origins outside the allowlist', async () =>
 });
 
 test('replaces unsafe request ids instead of trusting them', async () => {
-  const app = createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
+  const app = await createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
 
   const response = await request(app)
     .get('/api/health')
@@ -26,7 +26,7 @@ test('replaces unsafe request ids instead of trusting them', async () => {
 });
 
 test('returns a structured 400 for malformed JSON', async () => {
-  const app = createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
+  const app = await createApp({ config: testConfig({ MONGODB_URI: undefined }), logger: silentLogger });
 
   const response = await request(app)
     .post('/api/health')

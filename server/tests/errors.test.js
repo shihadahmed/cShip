@@ -23,7 +23,7 @@ function recordingLogger() {
 
 test('HttpError status and message are returned to the client', async () => {
   const logger = recordingLogger();
-  const app = createApp({
+  const app = await createApp({
     config: testConfig(),
     logger,
     registerRoutes(app) {
@@ -43,7 +43,7 @@ test('HttpError status and message are returned to the client', async () => {
 
 test('unexpected errors are logged and hidden from the client', async () => {
   const logger = recordingLogger();
-  const app = createApp({
+  const app = await createApp({
     config: testConfig(),
     logger,
     registerRoutes(app) {
@@ -65,7 +65,7 @@ test('unexpected errors are logged and hidden from the client', async () => {
 
 test('server errors never leak internal error codes', async () => {
   const logger = recordingLogger();
-  const app = createApp({
+  const app = await createApp({
     config: testConfig(),
     logger,
     registerRoutes(app) {
@@ -89,7 +89,7 @@ test('server errors never leak internal error codes', async () => {
 
 test('logs the route path without the query string', async () => {
   const logger = recordingLogger();
-  const app = createApp({
+  const app = await createApp({
     config: testConfig(),
     logger,
     registerRoutes(app) {

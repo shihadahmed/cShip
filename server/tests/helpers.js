@@ -32,6 +32,7 @@ export function testConfig(overrides = {}) {
     SSE_HEARTBEAT_MS: 15000,
     isProduction: false,
     SESSION_SECRET: 'a'.repeat(32), // 32-char secret for tests
+    ADMIN_GITHUB_LOGINS: 'testadmin', // Default admin login for tests
     ...overrides,
   };
 }

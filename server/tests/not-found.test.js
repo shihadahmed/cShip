@@ -5,7 +5,7 @@ import { createApp } from '../src/app.js';
 import { silentLogger, testConfig } from './helpers.js';
 
 test('unknown routes return a structured 404', async () => {
-  const app = createApp({ config: testConfig(), logger: silentLogger });
+  const app = await createApp({ config: testConfig(), logger: silentLogger });
 
   const response = await request(app).get('/api/does-not-exist');
 

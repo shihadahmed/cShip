@@ -1,5 +1,6 @@
-// Set test encryption key before any imports
+// Set environment variables BEFORE any imports that read them
 process.env.TOKEN_ENCRYPTION_KEY = '0'.repeat(64);
+process.env.ADMIN_GITHUB_LOGINS = 'testadmin';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +17,7 @@ import { notFound } from '../src/middleware/not-found.js';
 import { silentLogger } from './helpers.js';
 
 let registerRoutes;
+let clearAdminLoginsCache;
 
 async function loadRoutes() {
   const mod = await import('../src/routes/index.js');
@@ -32,7 +34,9 @@ test.before(async () => {
   await loadRoutes();
   mongod = await MongoMemoryServer.create();
   await mongoose.connect(mongod.getUri());
-  User = (await import('../src/models/User.js')).default;
+  const userModule = await import('../src/models/User.js');
+  User = userModule.default;
+  clearAdminLoginsCache = userModule.clearAdminLoginsCache;
   Project = (await import('../src/models/Project.js')).default;
   sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
   await Project.createIndexes();
@@ -94,6 +98,9 @@ test.beforeEach(async () => {
   await Project.createIndexes();
   await User.createIndexes();
   
+  // Clear admin logins cache to pick up env var
+  clearAdminLoginsCache();
+  
   config = {
     SESSION_SECRET: 'a'.repeat(32),
     CLIENT_ORIGIN: 'http://localhost:3000',
@@ -105,10 +112,11 @@ test.beforeEach(async () => {
 
   app = createApp(config);
 
+  // Create admin user (login must match ADMIN_GITHUB_LOGINS)
   user = await User.create({
     githubId: 11111,
-    login: 'alice',
-    name: 'Alice',
+    login: 'testadmin',
+    name: 'Test Admin',
     avatarUrl: 'https://example.com/avatar.png',
     encryptedToken: 'ghp_testtoken',
   });

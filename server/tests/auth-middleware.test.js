@@ -1,3 +1,7 @@
+// Set environment variables BEFORE any imports that read them
+process.env.TOKEN_ENCRYPTION_KEY = '0'.repeat(64);
+process.env.ADMIN_GITHUB_LOGINS = 'testadmin';
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
@@ -8,17 +12,19 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import MongoStore from 'connect-mongo';
 
-process.env.TOKEN_ENCRYPTION_KEY = '0'.repeat(64);
-
 let mongod;
 let User;
 let sessionStore;
+let clearAdminLoginsCache;
 
 test.before(async () => {
   mongod = await MongoMemoryServer.create();
   await mongoose.connect(mongod.getUri());
-  User = (await import('../src/models/User.js')).default;
+  const userModule = await import('../src/models/User.js');
+  User = userModule.default;
+  clearAdminLoginsCache = userModule.clearAdminLoginsCache;
   sessionStore = MongoStore.create({ mongoUrl: mongod.getUri() });
+  clearAdminLoginsCache();
 });
 
 test.after(async () => {
@@ -31,6 +37,7 @@ function createApp(config) {
   const app = express();
   app.use(express.json());
   app.use(cookieParser());
+  app.locals.config = config;
   app.use((req, res, next) => {
     req.config = config;
     next();
