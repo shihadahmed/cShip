@@ -23,16 +23,16 @@ test.after(async () => {
 test('production boots and serves degraded health when the database is unreachable', async () => {
   let attempts = 0;
   
-  // Use memory store for sessions by not providing SESSION_MONGODB_URI
-  // MONGODB_URI is fake for main DB, session middleware will use MemoryStore
-  const fakeUri = 'mongodb://127.0.0.1:1/cship';
+  // Use the in-memory MongoDB for session store in production
+  // Main DB connection will fail (simulated), but session store should work
+  const sessionUri = mongod.getUri();
 
   const instance = await startServer({
     config: testConfig({
       NODE_ENV: 'production',
       isProduction: true,
-      MONGODB_URI: fakeUri,
-      SESSION_MONGODB_URI: '', // empty string -> falsy -> MemoryStore
+      MONGODB_URI: 'mongodb://127.0.0.1:1/cship', // fake URI for main DB (will fail)
+      SESSION_MONGODB_URI: sessionUri, // real URI for session store
       PORT: 0,
       TOKEN_ENCRYPTION_KEY: '0'.repeat(64),
       SESSION_SECRET: 'a'.repeat(32),

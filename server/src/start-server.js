@@ -34,7 +34,7 @@ export async function startServer({
   if (!config) throw new Error('startServer requires a config object');
   if (!logger) throw new Error('startServer requires a logger');
 
-  const app = createApp({ config, logger, registerRoutes });
+  const app = await createApp({ config, logger, registerRoutes });
   const server = createServer(app);
 
   server.keepAliveTimeout = 65000;
@@ -99,6 +99,32 @@ export async function startServer({
     await new Promise((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });
+
+    const sessionStore = app.locals.sessionStore;
+    if (sessionStore) {
+      try {
+        // Wait for lazy store initialization (e.g. TTL index creation) to
+        // finish so closing the client does not interrupt an in-flight
+        // operation and surface as an unhandled rejection.
+        await sessionStore.collectionP;
+      } catch (error) {
+        logger.error('Session store initialization failed', { error: error.message });
+      }
+
+      try {
+        await sessionStore.close?.();
+      } catch (error) {
+        logger.error('Session store close failed', { error: error.message });
+      }
+    }
+
+    for (const limiter of Object.values(app.locals.rateLimiters || {})) {
+      try {
+        await limiter.close?.();
+      } catch (error) {
+        logger.error('Rate limiter close failed', { error: error.message });
+      }
+    }
 
     try {
       await disconnect();
