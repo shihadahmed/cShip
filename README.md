@@ -2,7 +2,7 @@
 
 cShip is a self-hosted, Vercel-like deployment control panel for a shared **cPanel** account. It connects GitHub repositories to cPanel subdomains, manages project `.env` files, restarts Passenger apps, and streams deployment logs to a small, focused dashboard.
 
-> **Current status: Phase 1 foundation.** The API, MongoDB lifecycle, cPanel-ready entrypoints, and dashboard shell are running. GitHub authentication, project import, the cPanel UAPI adapter, the build queue, and SSE log replay arrive in later phases.
+> **Current status: Phase 6 complete.** All phases implemented: Auth, GitHub integration, cPanel UAPI, deployment engine, settings UI, hardening, SSL/DNS verification, backup/restore, observability.
 
 ## Stack
 
@@ -68,6 +68,13 @@ If `MONGODB_URI` is not set in development, the API still boots and reports the 
 | `MAX_CONCURRENT_BUILDS` | Default `1`; keep this at `1` on shared hosting. |
 | `BUILD_TIMEOUT_MS` | Default 15 minutes. |
 | `SSE_HEARTBEAT_MS` | Default 15 seconds. |
+| `RATE_LIMIT_AUTH_MAX` | Auth endpoint max requests per window. Default `5`. |
+| `RATE_LIMIT_AUTH_WINDOW_MS` | Auth rate limit window (ms). Default `900000`. |
+| `RATE_LIMIT_WEBHOOK_MAX` | Webhook endpoint max requests per window. Default `30`. |
+| `RATE_LIMIT_WEBHOOK_WINDOW_MS` | Webhook rate limit window (ms). Default `60000`. |
+| `RATE_LIMIT_API_MAX` | General API max requests per window. Default `100`. |
+| `RATE_LIMIT_API_WINDOW_MS` | API rate limit window (ms). Default `60000`. |
+| `CPANEL_ROOT_DOMAIN` | Root domain for subdomain DNS/SSL verification. |
 
 Generate an encryption key with:
 
@@ -115,8 +122,9 @@ Both apps are already structured for Passenger: they listen on `process.env.PORT
 
 ## Roadmap
 
-- **Phase 2:** User/Project/Deployment models, GitHub OAuth, admin allowlist, encrypted tokens, project CRUD, repository import.
-- **Phase 3:** cPanel UAPI adapter, subdomain/Passenger provisioning, webhook registration, Mongo-backed sequential queue, SSE log replay.
-- **Phase 4:** New Project wizard, project details, live console, settings, env editor, redeploy/rollback.
-- **Phase 5:** Hardening, rate limits, release retention, audit log, failure-injection tests.
-- **Phase 6:** Operational polish and production runbooks.
+- ✅ **Phase 1:** Foundation — repo scaffold, Express/Next.js, health endpoints, dashboard shell
+- ✅ **Phase 2:** Auth & GitHub — OAuth, token encryption, project CRUD, GitHub API
+- ✅ **Phase 3:** Deployment Engine — cPanel UAPI, subdomains/Passenger, build queue, worker, SSE logs, webhooks
+- ✅ **Phase 4:** Dashboard Features — New Project wizard, project details, live console, settings, env editor, redeploy/rollback
+- ✅ **Phase 5:** Hardening — Rate limiting, release retention, rollback releases, audit logging, failure-injection tests
+- ✅ **Phase 6:** Operational Polish — cPanel runbook, SSL/DNS verification, backup/restore, observability, documentation
