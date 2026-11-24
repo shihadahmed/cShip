@@ -1,7 +1,7 @@
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_OAUTH_BASE = 'https://github.com/login/oauth';
 
-export function createGitHubClient({ getDecryptedToken, baseUrl = GITHUB_API_BASE, mock = false }) {
+export function createGitHubClient({ getDecryptedToken, getDecryptedRefreshToken, baseUrl = GITHUB_API_BASE, mock = false }) {
   async function request(path, options = {}) {
     const token = await getDecryptedToken();
     const url = `${baseUrl}${path}`;
@@ -76,6 +76,37 @@ export function createGitHubClient({ getDecryptedToken, baseUrl = GITHUB_API_BAS
     }
 
     return results;
+  }
+
+  /**
+   * Refreshes the GitHub access token using the refresh token
+   */
+  async function refreshAccessToken(refreshToken, clientId, clientSecret) {
+    const params = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    });
+
+    const response = await fetch(`${GITHUB_OAUTH_BASE}/access_token`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      const error = new Error(`GitHub token refresh failed: ${response.status}`);
+      error.status = response.status;
+      error.response = errorText;
+      throw error;
+    }
+
+    return response.json();
   }
 
   return {
@@ -160,6 +191,31 @@ export function createGitHubClient({ getDecryptedToken, baseUrl = GITHUB_API_BAS
       return request(`/repos/${owner}/${repo}/hooks/${hookId}`, {
         method: 'DELETE',
       });
+    },
+
+    // Expose refresh function for use by middleware
+    async refreshTokenIfNeeded(user, clientId, clientSecret) {
+      // Check if token is expired or about to expire
+      if (user.isTokenExpired && user.isTokenExpired()) {
+        const refreshToken = user.getDecryptedRefreshToken && user.getDecryptedRefreshToken();
+        if (refreshToken) {
+          try {
+            const tokenResponse = await refreshAccessToken(refreshToken, clientId, clientSecret);
+            if (tokenResponse.access_token) {
+              await user.updateGitHubTokens(
+                tokenResponse.access_token,
+                tokenResponse.refresh_token,
+                tokenResponse.expires_in
+              );
+              return tokenResponse.access_token;
+            }
+          } catch (error) {
+            // Refresh failed, will fall through to re-authentication
+            console.warn('GitHub token refresh failed:', error.message);
+          }
+        }
+      }
+      return null;
     },
   };
 }

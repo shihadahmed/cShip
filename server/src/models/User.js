@@ -57,6 +57,7 @@ const userSchema = new mongoose.Schema(
     avatarUrl: {
       type: String,
     },
+    // Encrypted access token (required)
     encryptedToken: {
       type: Object,
       required: true,
@@ -68,6 +69,24 @@ const userSchema = new mongoose.Schema(
         },
         message: 'encryptedToken must be a plain string or an object with iv, ciphertext, and tag',
       },
+    },
+    // Encrypted refresh token (optional, for token refresh)
+    encryptedRefreshToken: {
+      type: Object,
+      required: false,
+      validate: {
+        validator: function (v) {
+          if (!v) return true; // Optional
+          if (typeof v === 'string') return true;
+          return validateEncryptedToken(v);
+        },
+        message: 'encryptedRefreshToken must be a plain string or an object with iv, ciphertext, and tag',
+      },
+    },
+    // Token expiry timestamp (optional, for proactive refresh)
+    tokenExpiresAt: {
+      type: Date,
+      required: false,
     },
     admin: {
       type: Boolean,
@@ -83,15 +102,44 @@ userSchema.pre('validate', function (next) {
   if (typeof this.encryptedToken === 'string') {
     this.encryptedToken = crypto.encrypt(this.encryptedToken);
   }
-  const logins = getAdminLogins();
-  if (logins.includes(this.login)) {
-    this.admin = true;
+  if (typeof this.encryptedRefreshToken === 'string') {
+    this.encryptedRefreshToken = crypto.encrypt(this.encryptedRefreshToken);
   }
+  const logins = getAdminLogins();
+  this.admin = logins.includes(this.login);
   next();
 });
 
 userSchema.methods.getDecryptedToken = function () {
   return crypto.decrypt(this.encryptedToken);
+};
+
+userSchema.methods.getDecryptedRefreshToken = function () {
+  if (!this.encryptedRefreshToken) return null;
+  return crypto.decrypt(this.encryptedRefreshToken);
+};
+
+/**
+ * Updates the user's GitHub tokens after a refresh
+ */
+userSchema.methods.updateGitHubTokens = async function (accessToken, refreshToken, expiresIn) {
+  this.encryptedToken = accessToken; // Will be encrypted by pre-validate hook
+  if (refreshToken) {
+    this.encryptedRefreshToken = refreshToken;
+  }
+  if (expiresIn) {
+    this.tokenExpiresAt = new Date(Date.now() + expiresIn * 1000);
+  }
+  await this.save();
+};
+
+/**
+ * Checks if the access token is expired or about to expire (within 5 minutes)
+ */
+userSchema.methods.isTokenExpired = function () {
+  if (!this.tokenExpiresAt) return false; // Unknown, assume not expired
+  const bufferMs = 5 * 60 * 1000; // 5 minute buffer
+  return Date.now() >= (this.tokenExpiresAt.getTime() - bufferMs);
 };
 
 userSchema.statics.setAdminFromConfig = function (user, adminGithubLoginsParam) {

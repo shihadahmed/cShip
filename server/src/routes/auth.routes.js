@@ -4,7 +4,8 @@ import { optionalAuth } from '../middleware/auth.js';
 import { validateCsrf } from '../middleware/csrf.js';
 import { githubCallbackSchema, logoutSchema } from '../validators/auth.js';
 import { validate } from '../validators/validate.js';
-import User from '../models/User.js';
+import User, { getAdminLogins } from '../models/User.js';
+import AuditLog from '../models/AuditLog.js';
 import { createGitHubClient } from '../services/github/index.js';
 
 export const authRouter = express.Router();
@@ -23,6 +24,13 @@ function getDashboardUrl(config) {
           .filter(Boolean);
 
   return origins[0] || '/';
+}
+
+function getLoginUrl(config, errorCode) {
+  const origin = getDashboardUrl(config);
+  const suffix = `/login?error=${encodeURIComponent(errorCode)}`;
+  if (!origin || origin === '/') return suffix;
+  return `${origin.replace(/\/$/, '')}${suffix}`;
 }
 
 authRouter.get('/github', (req, res) => {
@@ -68,15 +76,11 @@ authRouter.get('/github/callback', validate(githubCallbackSchema), async (req, r
         config.GITHUB_CALLBACK_URL
       );
     } catch (error) {
-      return res.status(400).json({
-        error: { code: 'OAUTH_EXCHANGE_FAILED', message: 'Failed to exchange OAuth code' },
-      });
+      return res.redirect(getLoginUrl(config, 'auth_failed'));
     }
 
     if (!tokenResponse.access_token) {
-      return res.status(400).json({
-        error: { code: 'NO_ACCESS_TOKEN', message: 'No access token received from GitHub' },
-      });
+      return res.redirect(getLoginUrl(config, 'auth_failed'));
     }
 
     const tempClient = createGitHubClient({
@@ -87,16 +91,22 @@ authRouter.get('/github/callback', validate(githubCallbackSchema), async (req, r
     try {
       githubUser = await tempClient.getAuthenticatedUser();
     } catch (error) {
-      return res.status(400).json({
-        error: { code: 'GITHUB_USER_FETCH_FAILED', message: 'Failed to fetch GitHub user' },
-      });
+      return res.redirect(getLoginUrl(config, 'auth_failed'));
     }
 
     const adminLogins = config.adminGithubLogins || [];
     if (!adminLogins.includes(githubUser.login)) {
-      return res.status(403).json({
-        error: { code: 'NOT_ADMIN', message: 'User is not authorized to access cShip' },
-      });
+      if (AuditLog.db?.readyState === 1) {
+        AuditLog.create({
+          action: 'user.login_denied',
+          resource: 'user',
+          metadata: { login: githubUser.login, requestId: req.id },
+          severity: 'warning',
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        }).catch(() => {});
+      }
+      return res.redirect(getLoginUrl(config, 'not_admin'));
     }
 
     let user = await User.findOne({ githubId: githubUser.id });
@@ -107,21 +117,44 @@ authRouter.get('/github/callback', validate(githubCallbackSchema), async (req, r
         name: githubUser.name,
         avatarUrl: githubUser.avatar_url,
         encryptedToken: tokenResponse.access_token,
+        encryptedRefreshToken: tokenResponse.refresh_token,
+        tokenExpiresAt: tokenResponse.expires_in ? new Date(Date.now() + tokenResponse.expires_in * 1000) : undefined,
       });
     } else {
       user.login = githubUser.login;
       user.name = githubUser.name;
       user.avatarUrl = githubUser.avatar_url;
       user.encryptedToken = tokenResponse.access_token;
+      if (tokenResponse.refresh_token) {
+        user.encryptedRefreshToken = tokenResponse.refresh_token;
+      }
+      if (tokenResponse.expires_in) {
+        user.tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
+      }
     }
 
     await user.save();
 
-    req.session.userId = user._id;
-    req.session.save(err => {
-      if (err) return next(err);
-      const redirectUrl = getDashboardUrl(config);
-      res.redirect(redirectUrl);
+    // Regenerate the session on login to prevent session fixation.
+    req.session.regenerate((regenerateError) => {
+      if (regenerateError) return next(regenerateError);
+      req.session.userId = user._id;
+      req.session.save((saveError) => {
+        if (saveError) return next(saveError);
+        if (AuditLog.db?.readyState === 1) {
+          AuditLog.create({
+            userId: user._id,
+            action: 'user.login',
+            resource: 'user',
+            resourceId: user._id,
+            metadata: { login: user.login },
+            severity: 'info',
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+          }).catch(() => {});
+        }
+        res.redirect(getDashboardUrl(config));
+      });
     });
   } catch (error) {
     next(error);
@@ -146,12 +179,29 @@ authRouter.get('/me', optionalAuth, (req, res) => {
       error: { code: 'UNAUTHORIZED', message: 'Not authenticated' },
     });
   }
+
+  const config = req.app.locals.config;
+  const adminLogins = Array.isArray(config?.adminGithubLogins)
+    ? config.adminGithubLogins
+    : getAdminLogins();
+
+  // Admin membership is re-checked on every request so removing a user from
+  // ADMIN_GITHUB_LOGINS revokes access immediately (on next server restart).
+  if (!adminLogins.includes(req.user.login)) {
+    return req.session.destroy(() => {
+      res.clearCookie('connect.sid');
+      res.status(401).json({
+        error: { code: 'UNAUTHORIZED', message: 'Not authorized' },
+      });
+    });
+  }
+
   res.json({
     user: {
       login: req.user.login,
       name: req.user.name,
       avatarUrl: req.user.avatarUrl,
-      admin: req.user.admin,
+      admin: true,
     },
   });
 });
