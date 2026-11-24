@@ -8,6 +8,8 @@ import { errorHandler } from './middleware/error-handler.js';
 import { healthRouter } from './routes/health.routes.js';
 import { createSessionMiddleware } from './middleware/auth.js';
 import { createCsrfMiddleware } from './middleware/csrf.js';
+import { createAuditMiddleware } from './middleware/audit-log.js';
+import { authRateLimiter, webhookRateLimiter, apiRateLimiter } from './middleware/rate-limit.js';
 
 export function createApp({ config, logger, registerRoutes } = {}) {
   if (!config) throw new Error('createApp requires a config object');
@@ -47,6 +49,12 @@ export function createApp({ config, logger, registerRoutes } = {}) {
   app.use(validateCsrf);
 
   app.use('/api/health', healthRouter);
+
+  app.use('/api/auth', authRateLimiter);
+  app.use('/api/webhooks', webhookRateLimiter);
+  app.use('/api', apiRateLimiter);
+
+  app.use(createAuditMiddleware());
 
   if (typeof registerRoutes === 'function') {
     registerRoutes(app);

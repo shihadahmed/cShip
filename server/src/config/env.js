@@ -39,6 +39,12 @@ const envSchema = z
       .min(5000)
       .max(60000)
       .default(15000),
+    RATE_LIMIT_AUTH_MAX: z.coerce.number().int().min(1).max(100).default(5),
+    RATE_LIMIT_AUTH_WINDOW_MS: z.coerce.number().int().min(60000).max(3600000).default(900000),
+    RATE_LIMIT_WEBHOOK_MAX: z.coerce.number().int().min(1).max(200).default(30),
+    RATE_LIMIT_WEBHOOK_WINDOW_MS: z.coerce.number().int().min(10000).max(300000).default(60000),
+    RATE_LIMIT_API_MAX: z.coerce.number().int().min(10).max(1000).default(100),
+    RATE_LIMIT_API_WINDOW_MS: z.coerce.number().int().min(10000).max(300000).default(60000),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === 'production' && !value.MONGODB_URI) {
@@ -140,5 +146,10 @@ export function loadEnv(source = process.env) {
     clientOrigins,
     adminGithubLogins: splitList(env.ADMIN_GITHUB_LOGINS),
     isProduction: env.NODE_ENV === 'production',
+    rateLimit: {
+      auth: { max: env.RATE_LIMIT_AUTH_MAX, windowMs: env.RATE_LIMIT_AUTH_WINDOW_MS },
+      webhook: { max: env.RATE_LIMIT_WEBHOOK_MAX, windowMs: env.RATE_LIMIT_WEBHOOK_WINDOW_MS },
+      api: { max: env.RATE_LIMIT_API_MAX, windowMs: env.RATE_LIMIT_API_WINDOW_MS },
+    },
   };
 }
