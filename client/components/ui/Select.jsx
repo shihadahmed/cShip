@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useId, useRef, useState } from 'react';
+import { forwardRef, useId, useRef, useState, useEffect } from 'react';
 import { cn } from '@/lib/cn';
 import { ChevronDownIcon, ChevronUpIcon, SearchIcon, XIcon } from '@/components/icons';
 
@@ -133,14 +133,25 @@ export const Select = forwardRef(
             {value ? selectedOption?.label : placeholder}
           </span>
           {value && !disabled && (
-            <button
-              type="button"
-              className="ml-2 flex h-5 w-5 items-center justify-center rounded hover:bg-raised/50"
-              onClick={handleClear}
+            <span
+              className="ml-2 flex h-5 w-5 items-center justify-center rounded hover:bg-raised/50 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClear(e);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleClear(e);
+                }
+              }}
+              role="button"
+              tabIndex={0}
               aria-label="Clear selection"
             >
               <XIcon className="h-3.5 w-3.5" />
-            </button>
+            </span>
           )}
           {isOpen ? <ChevronUpIcon className="h-4 w-4 text-muted flex-shrink-0" /> : <ChevronDownIcon className="h-4 w-4 text-muted flex-shrink-0" />}
         </button>
