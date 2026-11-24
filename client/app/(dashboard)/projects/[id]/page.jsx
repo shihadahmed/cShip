@@ -11,7 +11,7 @@ import {
   GithubIcon, GitBranchIcon, ServerIcon, ExternalLinkIcon, TrashIcon,
   ChevronLeftIcon, LoaderIcon, CheckCircleIcon, XCircleIcon, PauseIcon, RotateCcwIcon, SettingsIcon
 } from '@/components/icons';
-import { fetchJson } from '@/lib/api';
+import { fetchJson, rollbackDeployment } from '@/lib/api';
 import { cn } from '@/lib/cn';
 
 export default function ProjectDetailPage() {
@@ -69,6 +69,19 @@ export default function ProjectDetailPage() {
         method: 'POST',
         body: JSON.stringify({ deploymentId }),
       });
+      router.refresh();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRollbackToRelease = async (releaseName) => {
+    if (!confirm(`Rollback to release "${releaseName}"? This will switch the current release.`)) return;
+    setActionLoading(true);
+    try {
+      await rollbackDeployment(projectId, releaseName);
       router.refresh();
     } catch (err) {
       alert(err.message);
@@ -242,6 +255,18 @@ export default function ProjectDetailPage() {
                               size="sm"
                               onClick={() => handleRedeploy(deployment._id)}
                               disabled={actionLoading}
+                            >
+                              <RotateCcwIcon className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {deployment.status === 'ready' && deployment.trigger === 'rollback' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRollbackToRelease(deployment.commit?.sha)}
+                              disabled={actionLoading}
+                              className="text-info hover:text-info"
+                              title="Rollback to this release"
                             >
                               <RotateCcwIcon className="h-3.5 w-3.5" />
                             </Button>

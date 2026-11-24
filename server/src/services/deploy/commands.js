@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export class CommandError extends Error {
   constructor(message, code, details = {}) {
@@ -12,11 +11,11 @@ export class CommandError extends Error {
   }
 }
 
-function getDeploymentsRoot(config) {
+export function getDeploymentsRoot(config) {
   return config.DEPLOYMENTS_ROOT || process.env.DEPLOYMENTS_ROOT || resolve(process.cwd(), 'deployments');
 }
 
-function getProjectDir(deploymentsRoot, projectId) {
+export function getProjectDir(deploymentsRoot, projectId) {
   return join(deploymentsRoot, projectId.toString());
 }
 
@@ -121,6 +120,8 @@ export async function runBuild({ projectDir, buildCommand, logger }) {
 export async function runCommand(command, args, options = {}) {
   const { cwd, logger, env = {}, timeout = 900000 } = options;
 
+  logger?.debug('Running command', { command, args, cwd });
+
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
@@ -136,6 +137,7 @@ export async function runCommand(command, args, options = {}) {
     const timeoutHandle = setTimeout(() => {
       killed = true;
       killProcessTree(child.pid);
+      logger?.warn('Command timed out', { command, args, timeout });
       reject(new CommandError(`Command timed out after ${timeout}ms`, 'COMMAND_TIMEOUT', { command, args }));
     }, timeout);
 
@@ -150,6 +152,7 @@ export async function runCommand(command, args, options = {}) {
     child.on('error', (error) => {
       clearTimeout(timeoutHandle);
       if (!killed) {
+        logger?.error('Command spawn failed', { command, args, error: error.message });
         reject(new CommandError(`Failed to spawn: ${error.message}`, 'SPAWN_FAILED', { command, args }));
       }
     });
@@ -157,6 +160,7 @@ export async function runCommand(command, args, options = {}) {
     child.on('close', (code) => {
       clearTimeout(timeoutHandle);
       if (!killed) {
+        logger?.debug('Command completed', { command, args, code: code ?? 0 });
         resolve({ stdout, stderr, code: code ?? 0 });
       }
     });
@@ -199,7 +203,7 @@ export async function copyStaticOutput({ projectDir, outputDir, documentRoot, lo
 
   const files = await fs.readdir(sourcePath);
   for (const file of files) {
-    const src = join(sourceDir, file);
+    const src = join(sourcePath, file);
     const dest = join(destPath, file);
     await fs.cp(src, dest, { recursive: true, force: true });
   }

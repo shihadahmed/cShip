@@ -134,6 +134,13 @@ export async function deleteDeployment(projectId, deploymentId) {
   });
 }
 
+export async function rollbackDeployment(projectId, releaseName) {
+  return fetchJson(`/api/deployments/${projectId}/rollback`, {
+    method: 'POST',
+    body: JSON.stringify({ releaseName }),
+  });
+}
+
 export async function registerWebhook(projectId) {
   return fetchJson(`/api/projects/${projectId}/webhook`, {
     method: 'POST',

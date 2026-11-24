@@ -2,40 +2,16 @@ import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { validateCsrf } from '../middleware/csrf.js';
 import { validate } from '../validators/validate.js';
-import { z } from 'zod';
+import { projectIdSchema, deploymentIdSchema, createDeploymentSchema, redeploySchema, rollbackSchema } from '../validators/deployments.js';
 import Deployment from '../models/Deployment.js';
 import Project from '../models/Project.js';
-import { ObjectId } from 'mongodb';
+import * as commands from '../services/deploy/commands.js';
+import * as releases from '../services/deploy/releases.js';
+import { resolve } from 'node:path';
 
 export const deploymentsRouter = express.Router();
 
 deploymentsRouter.use(requireAuth);
-
-const deploymentIdSchema = z.object({
-  params: z.object({
-    id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid deployment ID'),
-  }),
-});
-
-const projectIdSchema = z.object({
-  params: z.object({
-    projectId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid project ID'),
-  }),
-});
-
-const createDeploymentSchema = z.object({
-  body: z.object({
-    trigger: z.enum(['manual', 'rollback']).default('manual'),
-    commitSha: z.string().min(1).optional(),
-    branch: z.string().min(1).optional(),
-  }),
-});
-
-const redeploySchema = z.object({
-  body: z.object({
-    deploymentId: z.string().regex(/^[0-9a-fA-F]{24}$/),
-  }),
-});
 
 deploymentsRouter.get('/:projectId', validate(projectIdSchema), async (req, res, next) => {
   try {
@@ -159,6 +135,56 @@ deploymentsRouter.post('/:projectId/redeploy', validate(projectIdSchema), valida
     });
 
     res.status(201).json({ deployment });
+  } catch (error) {
+    next(error);
+  }
+});
+
+deploymentsRouter.post('/:projectId/rollback', validate(projectIdSchema), validateCsrf, validate(rollbackSchema), async (req, res, next) => {
+  try {
+    const project = await Project.findOne({ _id: req.params.projectId, userId: req.user._id });
+    if (!project) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Project not found' } });
+    }
+
+    const { releaseName } = req.body;
+
+    const deploymentsRoot = req.app.locals.config.DEPLOYMENTS_ROOT || resolve(process.cwd(), 'deployments');
+    const projectDir = commands.getProjectDir(deploymentsRoot, project._id);
+
+    // Verify the release exists
+    const releaseList = await releases.listReleases(projectDir, 100);
+    const targetRelease = releaseList.find(r => r.name === releaseName);
+    if (!targetRelease) {
+      return res.status(404).json({ error: { code: 'RELEASE_NOT_FOUND', message: `Release not found: ${releaseName}` } });
+    }
+
+    // Activate the release (switch symlink)
+    await releases.activateRelease(projectDir, releaseName);
+
+    // Restart Passenger app if document root exists
+    if (project.documentRoot) {
+      await commands.writeRestartTxt({ appPath: project.documentRoot, logger: req.app.locals.logger });
+    }
+
+    // Create deployment record for rollback
+    const deployment = new Deployment({
+      project: project._id,
+      trigger: 'rollback',
+      commit: {
+        sha: releaseName,
+        message: `Rollback to ${releaseName}`,
+        author: req.user.name || req.user.login,
+        url: '',
+      },
+      branch: project.branch,
+      status: 'ready',
+      finishedAt: new Date(),
+    });
+
+    await deployment.save();
+
+    res.json({ deployment });
   } catch (error) {
     next(error);
   }
