@@ -13,8 +13,21 @@ export function csrfTokenRoute(req, res) {
   res.json({ csrfToken: token });
 }
 
+const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+
+/**
+ * Webhook endpoints are authenticated by their provider signature (HMAC), not
+ * by a browser session, so they cannot participate in CSRF double-submit.
+ */
+function isCsrfExempt(req) {
+  return (
+    req.path?.startsWith('/api/webhooks') ||
+    req.originalUrl?.startsWith('/api/webhooks')
+  );
+}
+
 export function validateCsrf(req, res, next) {
-  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+  if (SAFE_METHODS.includes(req.method) || isCsrfExempt(req)) {
     return next();
   }
 
@@ -48,7 +61,7 @@ export function createCsrfMiddleware(config) {
   }
 
   function validateCsrf(req, res, next) {
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    if (SAFE_METHODS.includes(req.method) || isCsrfExempt(req)) {
       return next();
     }
 

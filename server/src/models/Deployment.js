@@ -30,6 +30,10 @@ const deploymentSchema = new mongoose.Schema(
     finishedAt: {
       type: Date,
     },
+    webhook: {
+      deliveryId: { type: String },
+      receivedAt: { type: Date },
+    },
   },
   {
     timestamps: true,
@@ -38,5 +42,6 @@ const deploymentSchema = new mongoose.Schema(
 
 deploymentSchema.index({ projectId: 1 });
 deploymentSchema.index({ status: 1 });
+deploymentSchema.index({ 'webhook.deliveryId': 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('Deployment', deploymentSchema);

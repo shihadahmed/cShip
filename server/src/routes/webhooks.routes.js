@@ -31,15 +31,29 @@ const webhookPayloadSchema = z.object({
 
 async function verifySignature(req, secret) {
   const signature = req.headers['x-hub-signature-256'];
-  if (!signature) return false;
+  if (!signature || typeof signature !== 'string') return false;
+  if (!Buffer.isBuffer(req.body)) return false;
 
-  const expected = `sha256=${crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex')}`;
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  const expected = `sha256=${crypto
+    .createHmac('sha256', secret)
+    .update(req.body)
+    .digest('hex')}`;
+
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (signatureBuffer.length !== expectedBuffer.length) return false;
+
+  return crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
 }
 
 webhooksRouter.post('/github', express.raw({ type: 'application/json' }), async (req, res, next) => {
   try {
-    const project = await Project.findOne({ 'webhook.id': req.headers['x-github-delivery'] });
+    // X-GitHub-Hook-ID identifies the registered hook; X-GitHub-Delivery is a
+    // per-delivery UUID used only for de-duplication.
+    const hookId = req.headers['x-github-hook-id'];
+    const project = hookId
+      ? await Project.findOne({ 'webhook.id': String(hookId) })
+      : null;
     if (!project) {
       return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: 'No project found for this webhook' } });
     }
@@ -72,29 +86,16 @@ webhooksRouter.post('/github', express.raw({ type: 'application/json' }), async 
       return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid webhook payload' } });
     }
 
-    const { ref, after: commitSha, repository, commits } = payload;
+    const { ref, after: commitSha } = payload;
     const branch = ref.replace('refs/heads/', '');
 
     if (branch !== project.branch) {
       return res.status(200).json({ message: 'Branch mismatch, ignoring', branch, expected: project.branch });
     }
 
-    const headCommit = commits?.[0] || {
-      id: commitSha,
-      message: 'No commit message',
-      author: { name: 'Unknown', email: 'unknown@example.com' },
-      url: `${repository.html_url}/commit/${commitSha}`,
-    };
-
     const deployment = new Deployment({
-      project: project._id,
-      trigger: 'webhook',
-      commit: {
-        sha: commitSha,
-        message: headCommit.message,
-        author: headCommit.author.name,
-        url: headCommit.url,
-      },
+      projectId: project._id,
+      commitSha,
       branch,
       status: 'queued',
       webhook: {
@@ -103,7 +104,19 @@ webhooksRouter.post('/github', express.raw({ type: 'application/json' }), async 
       },
     });
 
-    await deployment.save();
+    try {
+      await deployment.save();
+    } catch (error) {
+      // A concurrent delivery for the same event can race the pre-check.
+      if (error?.code === 11000) {
+        const existingDeployment = await Deployment.findOne({ 'webhook.deliveryId': deliveryId });
+        return res.status(200).json({
+          message: 'Already processed',
+          deploymentId: existingDeployment?._id,
+        });
+      }
+      throw error;
+    }
 
     res.status(202).json({ message: 'Deployment queued', deploymentId: deployment._id });
   } catch (error) {
