@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 
 export class ReleaseError extends Error {
   constructor(message, code, details = {}) {

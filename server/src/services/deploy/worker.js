@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events';
-import { ObjectId } from 'mongodb';
 import { createQueue } from '../../lib/queue.js';
-import { createSSEHub } from '../../lib/sse-hub.js';
+import { SSEHub } from '../../lib/sse-hub.js';
+import { resolve } from 'node:path';
 import * as commands from './commands.js';
 import * as releases from './releases.js';
+import { verifyDomain } from '../../services/cpanel/ssl-dns.js';
 
 export class WorkerError extends Error {
   constructor(message, code, details = {}) {
@@ -22,7 +23,7 @@ const DEPLOYMENT_STATUSES = Object.freeze({
   CANCELLED: 'cancelled',
 });
 
-export function createWorker({ config, logger, models, uapi, sseHub }) {
+export function createWorker({ config, logger, models, _uapi, sseHub }) {
   const { Deployment, Project } = models;
   const workerId = `worker-${process.pid}-${Date.now()}`;
   const queue = createQueue(config.MONGODB_URI, logger);
@@ -100,7 +101,7 @@ export function createWorker({ config, logger, models, uapi, sseHub }) {
     const deploymentsRoot = config.DEPLOYMENTS_ROOT || resolve(process.cwd(), 'deployments');
     const projectDir = commands.getProjectDir(deploymentsRoot, projectId);
 
-    const sse = sseHub ? createSSEHub() : null;
+    const sse = sseHub ? new SSEHub() : null;
     if (sse) {
       sse.startHeartbeat();
     }
@@ -137,6 +138,30 @@ export function createWorker({ config, logger, models, uapi, sseHub }) {
       });
 
       await updateDeploymentStatus(deploymentId, DEPLOYMENT_STATUSES.READY);
+
+      // Clean up old releases
+      const retention = project.releaseRetention || 5;
+      log(`Cleaning up old releases (keeping ${retention})`);
+      const deletedCount = await releases.cleanupOldReleases(projectDir, retention);
+      log(`Cleaned up ${deletedCount} old releases`);
+
+      // Verify DNS/SSL for subdomain and custom domain
+      try {
+        log('Verifying DNS and SSL...');
+        const verification = await verifyDomain(project, config);
+        
+        // Update project with verification results
+        await Project.findByIdAndUpdate(project._id, {
+          $set: { domainVerification: verification },
+        });
+        
+        log('DNS/SSL verification completed', { 
+          subdomain: verification.subdomain, 
+          customDomain: verification.customDomain 
+        });
+      } catch (verifyError) {
+        log('DNS/SSL verification failed', { error: verifyError.message });
+      }
 
       log('Deployment ready!');
       sse?.complete(deploymentId.toString(), { status: 'ready' });
@@ -182,6 +207,13 @@ export function createWorker({ config, logger, models, uapi, sseHub }) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  function getStats() {
+    return {
+      status: running ? 'running' : 'stopped',
+      workerId,
+    };
+  }
+
   return {
     start,
     stop,
@@ -190,6 +222,7 @@ export function createWorker({ config, logger, models, uapi, sseHub }) {
     events,
     workerId,
     isRunning: () => running,
+    getStats,
   };
 }
 

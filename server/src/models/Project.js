@@ -85,6 +85,26 @@ const projectSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Deployment',
     },
+    releaseRetention: {
+      type: Number,
+      default: 5,
+      min: 1,
+      max: 20,
+    },
+    domainVerification: {
+      subdomain: {
+        dns: { type: Boolean, default: false },
+        ssl: { type: Boolean, default: false },
+        checkedAt: Date,
+        error: String,
+      },
+      customDomain: {
+        dns: { type: Boolean, default: false },
+        ssl: { type: Boolean, default: false },
+        checkedAt: Date,
+        error: String,
+      },
+    },
   },
   {
     timestamps: true,

@@ -291,6 +291,17 @@ export function createQueue(mongoUri, logger) {
     return result.modifiedCount;
   }
 
+  async function getStats() {
+    ensureConnected();
+
+    const [depth, processing] = await Promise.all([
+      collection.countDocuments({ status: JOB_STATUSES.PENDING }),
+      collection.countDocuments({ status: { $in: [JOB_STATUSES.CLAIMED, JOB_STATUSES.RUNNING] } }),
+    ]);
+
+    return { depth, processing };
+  }
+
   return {
     connect,
     disconnect,
@@ -305,6 +316,7 @@ export function createQueue(mongoUri, logger) {
     releaseJob,
     cancelJob,
     markStaleJobsFailed,
+    getStats,
     STATUS: JOB_STATUSES,
   };
 }
