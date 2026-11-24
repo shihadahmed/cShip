@@ -45,6 +45,14 @@ const envSchema = z
     RATE_LIMIT_WEBHOOK_WINDOW_MS: z.coerce.number().int().min(10000).max(300000).default(60000),
     RATE_LIMIT_API_MAX: z.coerce.number().int().min(10).max(1000).default(100),
     RATE_LIMIT_API_WINDOW_MS: z.coerce.number().int().min(10000).max(300000).default(60000),
+    // Redis configuration for rate limiting (optional, enables distributed rate limiting)
+    REDIS_URL: z.string().url().optional(),
+    REDIS_HOST: z.string().optional(),
+    REDIS_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    REDIS_PASSWORD: z.string().optional(),
+    REDIS_DB: z.coerce.number().int().min(0).max(15).default(0),
+    // Request body size limit (e.g., '1mb', '500kb', '1000000')
+    BODY_SIZE_LIMIT: z.string().default('1mb'),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === 'production' && !value.MONGODB_URI) {
@@ -141,11 +149,25 @@ export function loadEnv(source = process.env) {
     ]);
   }
 
+  // Build Redis config from either URL or discrete params
+  let redisConfig = undefined;
+  if (env.REDIS_URL) {
+    redisConfig = { url: env.REDIS_URL };
+  } else if (env.REDIS_HOST) {
+    redisConfig = {
+      host: env.REDIS_HOST,
+      port: env.REDIS_PORT ?? 6379,
+      password: env.REDIS_PASSWORD,
+      db: env.REDIS_DB,
+    };
+  }
+
   return {
     ...env,
     clientOrigins,
-    adminGithubLogins: splitList(env.ADMIN_GITHUB_LOGINS),
+    adminGithubLogins: splitList(env.ADMIN_GITHUB_LOGINS).map((login) => login.toLowerCase()),
     isProduction: env.NODE_ENV === 'production',
+    redis: redisConfig,
     rateLimit: {
       auth: { max: env.RATE_LIMIT_AUTH_MAX, windowMs: env.RATE_LIMIT_AUTH_WINDOW_MS },
       webhook: { max: env.RATE_LIMIT_WEBHOOK_MAX, windowMs: env.RATE_LIMIT_WEBHOOK_WINDOW_MS },
