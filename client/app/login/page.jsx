@@ -5,7 +5,8 @@ import { GithubIcon } from '@/components/icons';
 
 export default function LoginPage() {
   const handleLogin = () => {
-    window.location.href = '/api/auth/github';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    window.location.href = `${apiUrl}/api/auth/github`;
   };
 
   return (
