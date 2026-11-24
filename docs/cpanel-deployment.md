@@ -176,7 +176,77 @@ For the cShip dashboard itself, `next build` is the heaviest operation. Run it d
 - Capability-detect `PassengerApps`; some cPanel versions do not expose it. If unavailable, register the Passenger app manually and let cShip manage files, `.env`, and `tmp/restart.txt`.
 - Never log the token. Surface UAPI errors with the module/function name and a safe message.
 
-## 10. Security checklist
+## 10. Phase 5 hardening features
+
+### Rate limiting
+
+Configure rate limits per endpoint group in `server/.env`:
+
+```bash
+# Auth endpoints (strict)
+RATE_LIMIT_AUTH_MAX=5
+RATE_LIMIT_AUTH_WINDOW_MS=900000
+
+# GitHub webhooks (moderate — GitHub retries)
+RATE_LIMIT_WEBHOOK_MAX=30
+RATE_LIMIT_WEBHOOK_WINDOW_MS=60000
+
+# General API (generous for dashboard)
+RATE_LIMIT_API_MAX=100
+RATE_LIMIT_API_WINDOW_MS=60000
+```
+
+Headers returned: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`. Exceeding returns 429 with `RATE_LIMITED` code.
+
+### Release retention
+
+Each project stores a configurable number of old releases (default 5, max 20). After every successful deployment, the worker automatically cleans up releases beyond the limit.
+
+Set per-project in the dashboard Settings → Build & Deploy → "Release retention".
+
+### Rollback releases
+
+Rollback switches the `current` symlink to a previous release and restarts Passenger:
+
+1. Dashboard → Project → Settings → Danger Zone → "Rollback to release"
+2. Or via API:
+```bash
+curl -X POST https://api.example.com/api/deployments/<projectId>/rollback \
+  -H "X-CSRF-Token: <token>" \
+  -H "Cookie: <session>" \
+  -d '{"releaseName": "release-1700000000"}'
+```
+
+Creates a new deployment record with `trigger: "rollback"` and status `ready`.
+
+### Audit logging
+
+All mutating actions (POST/PATCH/DELETE) are logged immutably to MongoDB:
+
+- Project CRUD, webhook register/unregister
+- Deploy, redeploy, rollback
+- Login/logout
+- Settings updates
+
+Query in Atlas: filter by `userId`, `action`, `resource`, `createdAt`. Audit logs cannot be modified or deleted.
+
+### Failure-injection tests
+
+The test suite includes simulated failure scenarios for CI validation:
+
+- Git clone/checkout/fetch failures
+- NPM install/ci/audit failures
+- Build command failures, missing output directory, timeouts
+- Resource exhaustion (ENOSPC, OOM, permission errors)
+
+Run full test suite:
+```bash
+npm --prefix server test
+npm --prefix client test
+npm test
+```
+
+## 11. Security checklist
 
 - Keep `server/.env` at mode `0600`, owned by the cPanel user.
 - Keep application roots outside `public_html`.
@@ -188,7 +258,7 @@ For the cShip dashboard itself, `next build` is the heaviest operation. Run it d
 - Treat project build commands as admin-authored code execution; validate slugs and paths, and never interpolate untrusted input into shell commands.
 - Review Passenger and Apache/LiteSpeed logs after the first deployment.
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | Symptom | Likely cause | Action |
 |---|---|---|
@@ -203,8 +273,13 @@ For the cShip dashboard itself, `next build` is the heaviest operation. Run it d
 | `git pull` prompts or fails | No non-interactive credentials | Use a deploy key or token, set `GIT_TERMINAL_PROMPT=0`, and verify the remote |
 | Webhook returns 401 | Secret mismatch or raw body altered | Verify the HMAC against the raw body before JSON parsing |
 | `.env` values missing at runtime | App does not load dotenv, or env is build-time only | Load `.env` in the server entrypoint; rebuild Next.js when public env changes |
+| Rate limit 429 on login | Too many auth attempts | Check `RATE_LIMIT_AUTH_MAX`/`WINDOW_MS`; wait for window to reset |
+| Webhook rate limited (429) | GitHub retries exceeding limit | Increase `RATE_LIMIT_WEBHOOK_MAX` or ensure webhook secret is correct |
+| Rollback fails | Release doesn't exist or Passenger not running | Verify release in `releases/` dir; check `tmp/restart.txt` permissions |
+| Audit log missing | Middleware order or no authenticated user | Ensure `createAuditMiddleware()` runs after session; user must be authenticated |
+| Build timeout | Build exceeds `BUILD_TIMEOUT_MS` | Check build logs; optimize build or increase timeout if account allows |
 
-## 12. Restart and verification commands
+## 13. Restart and verification commands
 
 ```bash
 # API
@@ -221,3 +296,28 @@ npm --prefix server run lint
 npm --prefix client run lint
 npm --prefix client run build
 ```
+
+## 14. Backup and restore
+
+### Automated backup (cron)
+```bash
+# Add to crontab: 0 2 * * * /home/<user>/cship/scripts/backup.sh
+```
+
+### Manual backup
+```bash
+cd /home/<user>/cship
+./scripts/backup.sh
+```
+
+### Verify backup
+```bash
+./scripts/verify-backup.sh /backups/cship-20260101-020000.tar.gz
+```
+
+### Restore (staging only — drops database!)
+```bash
+./scripts/restore.sh /backups/cship-20260101-020000.tar.gz
+```
+
+See `docs/backup-restore.md` for full procedures.
