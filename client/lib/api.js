@@ -53,7 +53,7 @@ export async function fetchMe() {
 }
 
 export async function login() {
-  window.location.href = '/api/auth/github';
+  window.location.href = `${getApiBaseUrl()}/api/auth/github`;
 }
 
 export async function logout() {

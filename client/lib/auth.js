@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { getApiBaseUrl } from './api';
 
 const AuthContext = createContext(null);
 
@@ -34,12 +35,12 @@ export function AuthProvider({ children }) {
   }, [loading, user, pathname, router]);
 
   const login = () => {
-    window.location.href = '/api/auth/github';
+    window.location.href = `${getApiBaseUrl()}/api/auth/github`;
   };
 
   const logout = async () => {
     const csrfToken = getCsrfToken();
-    await fetch('/api/auth/logout', {
+    await fetch(`${getApiBaseUrl()}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'X-CSRF-Token': csrfToken },
@@ -68,7 +69,7 @@ export function useAuth() {
 }
 
 export async function fetchMe() {
-  const res = await fetch('/api/auth/me', { credentials: 'include' });
+  const res = await fetch(`${getApiBaseUrl()}/api/auth/me`, { credentials: 'include' });
   if (res.status === 401) return null;
   return res.json();
 }
